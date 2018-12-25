@@ -11,6 +11,11 @@ def load_graph():
 
 
 def one_hot_embed(node, graph):
+    """
+    :param node: node_id
+    :param graph: G
+    :return: embedding [0 0 0 ... 1 0 0 ... 0]
+    """
     emb_line = np.zeros(len(graph.nodes()) + 1)
     emb_line[int(node)] = 1
     # a = graph.node[node]['label'][1:len(graph.node[node]['label']) - 1]
@@ -20,7 +25,14 @@ def one_hot_embed(node, graph):
     return emb_line
 
 
+# random walk sample
 def random_walk(graph, start, walk_length):
+    """
+    :param graph: G
+    :param start: start node
+    :param walk_length: path_length
+    :return: random walk path
+    """
     path = []
     path.append(start)
     for _ in range(walk_length - 1):
@@ -33,10 +45,10 @@ def random_walk(graph, start, walk_length):
 # N-gram
 def get_targets(path, idx, window_size=5):
     """
-    :param path:
-    :param idx:
-    :param window_size:
-    :return:
+    :param path: random walk sample
+    :param idx: target node
+    :param window_size: window size
+    :return: [... idx - 1 idx idx + 1 ...]
     """
     target_window = np.random.randint(1, window_size + 1)
     start_point = idx - target_window if (idx - target_window) > 0 else 0
@@ -45,7 +57,13 @@ def get_targets(path, idx, window_size=5):
     return list(targets)
 
 
+# generate bacth  x: embedding of the node y: predict node_num
 def get_batch(graph, window_size=5):
+    """
+    :param graph: G
+    :param window_size: window size
+    :return: batch
+    """
     nodes_list = graph.nodes()
     random.shuffle(nodes_list)
     for node in nodes_list:
