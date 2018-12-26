@@ -26,20 +26,23 @@ def one_hot_embed(node, graph):
 
 
 # random walk sample
-def random_walk(graph, start, walk_length):
+def random_walk(graph, times, start, walk_length):
     """
     :param graph: G
     :param start: start node
     :param walk_length: path_length
     :return: random walk path
     """
-    path = []
-    path.append(start)
-    for _ in range(walk_length - 1):
-        neighbor = graph.neighbors(start)
-        start = neighbor[random.randint(0, len(neighbor) - 1)]
+    path_total = []
+    for _ in range(times):
+        path = []
         path.append(start)
-    return path
+        for _ in range(walk_length - 1):
+            neighbor = graph.neighbors(start)
+            start = neighbor[random.randint(0, len(neighbor) - 1)]
+            path.append(start)
+        path_total.append(path)
+    return path_total
 
 
 # N-gram
@@ -58,29 +61,30 @@ def get_targets(path, idx, window_size=5):
 
 
 # generate bacth  x: embedding of the node y: predict node_num
-def get_batch(graph, window_size=5):
+def get_batch(nodes_list, window_size=5):
     """
     :param graph: G
     :param window_size: window size
     :return: batch
     """
-    nodes_list = graph.nodes()
-    random.shuffle(nodes_list)
     for node in nodes_list:
         x, y = [], []
-        path = random_walk(graph=graph, start=node, walk_length=50)
-        for idx in range(len(path)):
-            batch_x = path[idx]
-            batch_y = get_targets(path, idx, window_size)
-            x_emb = one_hot_embed(batch_x, graph)
-            for _ in range(len(batch_y)):
-                x.append(x_emb)
-            y.extend(batch_y)
+        path = random_walk(graph=graph, times=5, start=node, walk_length=50)
+        for num in range(np.shape(path)[0]):
+            for idx in range(len(path[num])):
+                batch_x = path[num][idx]
+                batch_y = get_targets(path[num], idx, window_size)
+                x_emb = one_hot_embed(batch_x, graph)
+                for _ in range(len(batch_y)):
+                    x.append(x_emb)
+                y.extend(batch_y)
         yield x, y
 
 
-def deep_walk(graph, embedding_size, num_sampled):
+def deep_walk(graph, embedding_size, num_sampled, window_size):
     node_num = len(graph.nodes()) + 1
+    nodes_list = graph.nodes()
+    random.shuffle(nodes_list)
     train_graph = tf.Graph()
     with train_graph.as_default():
         inputs = tf.placeholder(tf.float32, shape=[None, node_num], name='inputs')
@@ -102,17 +106,14 @@ def deep_walk(graph, embedding_size, num_sampled):
         saver = tf.train.Saver()
 
     with tf.Session(graph=train_graph) as sess:
-        epochs = 10
-        window_size = 5
+        epochs = 1
         iteration = 1
         loss = 0
         sess.run(tf.global_variables_initializer())
         for e in range(1, epochs + 1):
-            batches = get_batch(graph, window_size)
+            batches = get_batch(nodes_list=nodes_list, window_size=window_size)
             start = time.time()
             for x, y in batches:
-                # print("x:", x)
-                # print("y:", y)
                 feed = {inputs: x,
                         labels: np.array(y)[:, None]}
                 train_loss, _ = sess.run([cost, optimizer], feed_dict=feed)
@@ -125,12 +126,13 @@ def deep_walk(graph, embedding_size, num_sampled):
                           "{:.4f} sec/batch".format((end - start) / 10))
                     loss = 0
                     start = time.time()
-
                 iteration += 1
+        saver.save(sess, "save")
+
 
 
 if __name__ == '__main__':
     graph = load_graph()
-    deep_walk(graph, 20, 100)
+    deep_walk(graph=graph, embedding_size=20, num_sampled=100, window_size=5)
 
 
