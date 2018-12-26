@@ -1,6 +1,7 @@
 import numpy as np
 import networkx as nx
 import tensorflow as tf
+import os
 import time
 import random
 
@@ -82,6 +83,7 @@ def get_batch(nodes_list, window_size=5):
 
 
 def deep_walk(graph, embedding_size, num_sampled, window_size):
+    checkpoint = os.path.join(os.getcwd(), 'save/model.ckpt')
     node_num = len(graph.nodes()) + 1
     nodes_list = graph.nodes()
     random.shuffle(nodes_list)
@@ -89,11 +91,12 @@ def deep_walk(graph, embedding_size, num_sampled, window_size):
     with train_graph.as_default():
         inputs = tf.placeholder(tf.float32, shape=[None, node_num], name='inputs')
         labels = tf.placeholder(tf.int32, shape=[None, 1], name='labels')
-        embeddings = tf.Variable(tf.random_uniform([node_num, embedding_size], -1, 1))
-        embed = tf.matmul(inputs, embeddings)
+        embeddings = tf.Variable(tf.random_uniform([node_num, embedding_size], -1, 1), name='embeddings')
+        embed = tf.matmul(inputs, embeddings, name='embed')
         # embed = tf.nn.embedding_lookup(embeddings, inputs)
-        weights = tf.Variable(tf.truncated_normal([node_num, embedding_size], stddev=0.1), dtype=tf.float32)
-        biases = tf.Variable(tf.zeros(node_num), dtype=tf.float32)
+        weights = tf.Variable(tf.truncated_normal([node_num, embedding_size], stddev=0.1),
+                              dtype=tf.float32, name='weights')
+        biases = tf.Variable(tf.zeros(node_num), dtype=tf.float32, name='biases')
         loss = tf.nn.nce_loss(weights=weights,
                               biases=biases,
                               labels=labels,
@@ -127,8 +130,7 @@ def deep_walk(graph, embedding_size, num_sampled, window_size):
                     loss = 0
                     start = time.time()
                 iteration += 1
-        saver.save(sess, "save")
-
+        saver.save(sess, checkpoint)
 
 
 if __name__ == '__main__':
