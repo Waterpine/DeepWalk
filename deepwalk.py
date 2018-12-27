@@ -70,7 +70,7 @@ def get_batch(nodes_list, window_size=5):
     """
     for node in nodes_list:
         x, y = [], []
-        path = random_walk(graph=graph, times=5, start=node, walk_length=50)
+        path = random_walk(graph=graph, times=50, start=node, walk_length=50)
         for num in range(np.shape(path)[0]):
             for idx in range(len(path[num])):
                 batch_x = path[num][idx]
@@ -83,7 +83,7 @@ def get_batch(nodes_list, window_size=5):
 
 
 def deep_walk(graph, embedding_size, num_sampled, window_size):
-    checkpoint = os.path.join(os.getcwd(), 'save/model.ckpt')
+    checkpoint = os.path.join(os.getcwd(), 'embedding/model.ckpt')
     node_num = len(graph.nodes()) + 1
     nodes_list = graph.nodes()
     random.shuffle(nodes_list)
@@ -135,6 +135,6 @@ def deep_walk(graph, embedding_size, num_sampled, window_size):
 
 if __name__ == '__main__':
     graph = load_graph()
-    deep_walk(graph=graph, embedding_size=20, num_sampled=100, window_size=5)
+    deep_walk(graph=graph, embedding_size=128, num_sampled=5, window_size=5)
 
 
