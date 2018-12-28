@@ -57,22 +57,22 @@ def load_model():
 def get_batch(graph, batch_size, type):
     embeddings_total = load_model()
     if type == 'train':
-        embeddings = embeddings_total[:int(len(embeddings_total) * 0.8)]
+        embeddings = embeddings_total[:int(len(embeddings_total) * 0.9)]
         num_batch = len(embeddings) // batch_size
         for num in range(num_batch):
             x, y = [], []
             for idx in range(batch_size):
                 label = label_to_list(graph.node[str(batch_size * num + idx + 1)]['label'])
                 if len(label) == 1:
-                    x.append(embeddings[batch_size * num + idx])
+                    x.append(embeddings_total[batch_size * num + idx + 1])
                     y_emb = one_hot_embed(label)
                     y.append(y_emb)
             yield x, y
     elif type == 'test':
-        embeddings = embeddings_total[int(len(embeddings_total) * 0.8):]
+        embeddings = embeddings_total[int(len(embeddings_total) * 0.9):]
         x, y = [], []
         for idx in range(len(embeddings)):
-            num = int(len(embeddings_total) * 0.8) + idx
+            num = int(len(embeddings_total) * 0.9) + idx
             label = label_to_list(graph.node[str(num)]['label'])
             if len(label) == 1:
                 x.append(embeddings_total[num])
@@ -93,14 +93,14 @@ def classification_model(embedding_size):
         labels_c = tf.placeholder(tf.int32, [None, node_classes], name='label_c')
         weight_c = tf.Variable(tf.truncated_normal([embedding_size, node_classes], stddev=0.1), dtype=tf.float32)
         bias_c = tf.Variable(tf.zeros(node_classes), dtype=tf.float32)
-        logits_c = tf.add(tf.matmul(embeddings_c, weight_c), bias_c)
+        logits_c = tf.nn.softmax(tf.add(tf.matmul(embeddings_c, weight_c), bias_c))
         # loss_c = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(labels=labels_c, logits=logits_c))
         loss_c, accuracy_c = loss_and_metric(logits=logits_c, labels=labels_c)
-        optimizer_c = tf.train.AdamOptimizer(learning_rate=0.001).minimize(loss_c)
+        optimizer_c = tf.train.AdamOptimizer(learning_rate=0.005).minimize(loss_c)
         # saver_c = tf.train.Saver()
 
     with tf.Session(graph=classification_graph) as sess:
-        epochs = 10000
+        epochs = 100
         iteration = 1
         total_loss = 0
         sess.run(tf.global_variables_initializer())
@@ -137,6 +137,9 @@ def classification_model(embedding_size):
 
 if __name__ == '__main__':
     embeddings = load_model()
+    print(np.shape(embeddings)[0])
+    print(np.shape(embeddings)[1])
+    # print(embeddings)
     embedding_size = np.shape(embeddings)[1]
     classification_model(embedding_size)
 
