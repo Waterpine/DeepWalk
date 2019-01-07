@@ -8,7 +8,7 @@ import tensorflow as tf
 
 
 def load_graph():
-    g = nx.read_gexf("data/data.gexf")
+    g = nx.read_gexf("data/BlogCatalog.gexf")
     return g
 
 
@@ -32,10 +32,6 @@ def one_hot_embed(node, graph):
     """
     emb_line = np.zeros(len(graph.nodes()) + 1)
     emb_line[int(node)] = 1
-    # a = graph.node[node]['label'][1:len(graph.node[node]['label']) - 1]
-    # b = a.split(' ')
-    # for idx in b:
-    #     emb_line[int(idx.split(',')[0]) - 1] = 1
     return emb_line
 
 
@@ -120,7 +116,7 @@ def deep_walk(graph, embedding_size, num_sampled, window_size):
         # loss = tf.nn.sampled_softmax_loss(weights, biases, labels, embed, num_sampled, node_num)
         cost = tf.reduce_mean(loss)
         optimizer = tf.train.AdamOptimizer(learning_rate=0.005).minimize(cost)
-        saver = tf.train.Saver(max_to_keep=None)
+        saver = tf.train.Saver(max_to_keep=5)
 
     with tf.Session(graph=train_graph) as sess:
         epochs = 1
@@ -136,23 +132,23 @@ def deep_walk(graph, embedding_size, num_sampled, window_size):
                         labels: np.array(y)[:, None]}
                 train_loss, _ = sess.run([cost, optimizer], feed_dict=feed)
                 loss += train_loss
-                if iteration % 100 == 0:
+                if iteration % 1000 == 0:
                     end = time.time()
                     print("Epoch {}/{}".format(e, epochs),
                           "Iteration: {}".format(iteration),
-                          "Avg. Training loss: {:.4f}".format(loss / 100),
-                          "{:.4f} sec/batch".format((end - start) / 100))
+                          "Avg. Training loss: {:.4f}".format(loss / 1000),
+                          "{:.4f} sec/batch".format((end - start) / 1000))
                     train_loss_dict[iteration] = train_loss
-                    saver.save(sess, 'embedding/{}.ckpt'.format(iteration))
+                    saver.save(sess, 'embedding/{}.ckpt'.format(iteration), global_step=iteration)
                     loss = 0
                     start = time.time()
                 iteration += 1
             sorted_train_loss = sorted(train_loss_dict.items(),
                                        key=operator.itemgetter(1),
-                                       reverse=True)
+                                       reverse=False)
             best_iter, _ = sorted_train_loss[0]
             print("best_iter:", best_iter)
-            del_files(path="embedding", best_iter=best_iter)
+            # del_files(path="embedding", best_iter=best_iter)
 
 
 if __name__ == '__main__':

@@ -3,16 +3,20 @@ import time
 import numpy as np
 import tensorflow as tf
 import networkx as nx
+from sklearn import metrics
 
 
 def load_graph():
-    g = nx.read_gexf("data/data.gexf")
+    g = nx.read_gexf("data/BlogCatalog.gexf")
     return g
 
 
 def loss_and_metric(logits, labels):
     labels = tf.cast(labels, tf.float32)
     logits = tf.cast(logits, tf.float32)
+
+    predictions = tf.argmax(logits, -1)
+    actuals = tf.argmax(labels, -1)
 
     cross_entropy_loss = tf.reduce_mean(
         tf.nn.softmax_cross_entropy_with_logits_v2(
@@ -21,7 +25,7 @@ def loss_and_metric(logits, labels):
     hits = tf.equal(tf.argmax(logits, -1), tf.argmax(labels, -1))
     accuracy = tf.reduce_mean(tf.cast(hits, tf.float32))
 
-    return cross_entropy_loss, accuracy
+    return cross_entropy_loss, predictions, actuals
 
 
 def label_to_list(label):
@@ -46,10 +50,9 @@ def one_hot_embed(label):
 
 def load_model():
     with tf.Session() as sess:
-        saver = tf.train.import_meta_graph("embedding/model.ckpt.meta")
+        saver = tf.train.import_meta_graph("embedding/7000.ckpt-7000.meta")
         saver.restore(sess, tf.train.latest_checkpoint("embedding"))
         graph = tf.get_default_graph()
-        # print([n.name for n in tf.get_default_graph().as_graph_def().node])
         embeddings = graph.get_tensor_by_name("embeddings:0").eval()
     return embeddings
 
@@ -57,7 +60,7 @@ def load_model():
 def get_batch(graph, batch_size, type):
     embeddings_total = load_model()
     if type == 'train':
-        embeddings = embeddings_total[:int(len(embeddings_total) * 0.9)]
+        embeddings = embeddings_total[:int(len(embeddings_total) * 0.6)]
         num_batch = len(embeddings) // batch_size
         for num in range(num_batch):
             x, y = [], []
@@ -69,10 +72,10 @@ def get_batch(graph, batch_size, type):
                     y.append(y_emb)
             yield x, y
     elif type == 'test':
-        embeddings = embeddings_total[int(len(embeddings_total) * 0.9):]
+        embeddings = embeddings_total[int(len(embeddings_total) * 0.6):]
         x, y = [], []
         for idx in range(len(embeddings)):
-            num = int(len(embeddings_total) * 0.9) + idx
+            num = int(len(embeddings_total) * 0.6) + idx
             label = label_to_list(graph.node[str(num)]['label'])
             if len(label) == 1:
                 x.append(embeddings_total[num])
@@ -84,7 +87,6 @@ def get_batch(graph, batch_size, type):
 
 
 def classification_model(embedding_size):
-    # checkpoint = os.path.join(os.getcwd(), 'save/model.ckpt')
     graph = load_graph()
     node_classes = 39
     classification_graph = tf.Graph()
@@ -95,9 +97,8 @@ def classification_model(embedding_size):
         bias_c = tf.Variable(tf.zeros(node_classes), dtype=tf.float32)
         logits_c = tf.nn.softmax(tf.add(tf.matmul(embeddings_c, weight_c), bias_c))
         # loss_c = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(labels=labels_c, logits=logits_c))
-        loss_c, accuracy_c = loss_and_metric(logits=logits_c, labels=labels_c)
+        loss_c, predict_c, true_c = loss_and_metric(logits=logits_c, labels=labels_c)
         optimizer_c = tf.train.AdamOptimizer(learning_rate=0.005).minimize(loss_c)
-        # saver_c = tf.train.Saver()
 
     with tf.Session(graph=classification_graph) as sess:
         epochs = 100
@@ -122,7 +123,6 @@ def classification_model(embedding_size):
                     total_loss = 0
                     start = time.time()
                 iteration += 1
-        # saver_c.save(sess, checkpoint)
 
         # test
         batches = get_batch(graph=graph, batch_size=128, type='test')
@@ -131,15 +131,19 @@ def classification_model(embedding_size):
             print(np.shape(y))
             feed = {embeddings_c: x,
                     labels_c: y}
-            accuracy = sess.run(accuracy_c, feed_dict=feed)
-            print("accuracy: ", accuracy)
+            y_predict, y_true = sess.run([predict_c, true_c], feed_dict=feed)
+            print("predict:", y_predict)
+            print("true:", y_true)
+            print('macro-f1-score:', metrics.f1_score(y_true, y_predict,
+                                                      labels=list(range(1, node_classes + 1)), average='macro'))
+            print('micro-f1-score:', metrics.f1_score(y_true, y_predict,
+                                                      labels=list(range(1, node_classes + 1)), average='micro'))
 
 
 if __name__ == '__main__':
     embeddings = load_model()
     print(np.shape(embeddings)[0])
     print(np.shape(embeddings)[1])
-    # print(embeddings)
     embedding_size = np.shape(embeddings)[1]
     classification_model(embedding_size)
 

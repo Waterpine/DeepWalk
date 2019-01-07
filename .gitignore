@@ -3,5 +3,6 @@ data/*
 try.py
 __pycache__/*
 preprocessing/BlogCatalog-dataset/*
+preprocessing/*.mat
 save/*
 embedding/*
